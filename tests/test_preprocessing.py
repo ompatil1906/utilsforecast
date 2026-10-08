@@ -126,6 +126,7 @@ def get_pandas_freqs():
         "1h",
         "QS-NOV",
         "QE",
+        "2QE",
     ]
     try:
         pd.tseries.frequencies.to_offset("YE")
@@ -523,3 +524,24 @@ class TestFillGapsIncompatibleFrequency:
                 data = create_error_test_data(dates_int, N_PERIODS, include_start, include_end, "polars")
                 with pytest.raises(ValueError):
                     fill_gaps(data, freq_str, start=start, end=end)
+
+
+def test_fill_gaps_multi_quarter_keeps_quarter_multiple():
+    """Multi-quarter offsets must not collapse to a single quarter.
+
+    Regression: the quarter branch set n = 3, discarding offset.n, so 2QE/2QS
+    inserted quarterly rows instead of semi-annual ones.
+    """
+    cases = {
+        "2QE": ["2020-03-31", "2020-09-30", "2021-03-31", "2021-09-30", "2022-03-31"],
+        "2QS": ["2020-01-01", "2020-07-01", "2021-01-01", "2021-07-01", "2022-01-01"],
+    }
+    for freq, stamps in cases.items():
+        ds = pd.to_datetime(stamps)
+        # drop the middle timestamp; fill_gaps should restore only that one
+        kept = [stamps[0], stamps[1], stamps[3], stamps[4]]
+        df = pd.DataFrame({"unique_id": "a", "ds": pd.to_datetime(kept), "y": 1.0})
+        out = fill_gaps(df, freq=freq)
+        got = out["ds"].dt.strftime("%Y-%m-%d").tolist()
+        assert got == stamps, (freq, got)
+        assert out["y"].isna().sum() == 1

@@ -133,7 +133,9 @@ def id_time_grid(
             # hours are represented as 'h' in numpy
             freq = "h"
         elif isinstance(offset.base, (pd.offsets.QuarterBegin, pd.offsets.QuarterEnd)):
-            n = 3
+            # offset.n is the number of quarters (1 for QE, 2 for 2QE).
+            # numpy has no quarter unit, so expand to months without dropping the multiple.
+            n *= 3
             freq = "M"
         elif isinstance(offset.base, (pd.offsets.YearBegin, pd.offsets.YearEnd)):
             freq = "Y"
